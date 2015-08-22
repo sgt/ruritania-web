@@ -126,28 +126,21 @@ class LocationPanel extends React.Component
           @sleepButton 'In a hotel', 'hotel'
         div {className: 'col-md-6'},
           h3 {}, 'See'
-          for sight in @props.location.sights
+          _.map @props.location.sights, (sight) =>
             @seeButton "The #{sight} of #{@props.location.name}"
 
       div {className: 'row'},
         table {className: 'table table-hover table-condensed', id: 'travelTable', style: {marginTop: '100px'}},
           tbody {},
-            for dest in @props.location.destinations
-              travelEntry
-                key: dest.name,
-                destination: dest,
-                handleTravel: @props.handleTravel
-
-class TravelEntry extends React.Component
-  render: ->
-    tr {},
-      td {}, @props.destination.name
-      td {}, "$#{@props.destination.price}"
-      td {}, actionButton 'Travel',
-        () => @props.handleTravel @props.destination,
-          {glyph: 'plane'}
-
-travelEntry = React.createFactory TravelEntry
+            _.map @props.location.destinations, (dest) =>
+              tr({key: dest.name},
+                td {}, dest.name
+                td {}, "$#{dest.price}"
+                td {}, actionButton 'Travel',
+                  () =>
+                    console.log dest
+                    @props.handleTravel dest,
+                  {glyph: 'plane'})
 
 # ================================
 
@@ -244,7 +237,6 @@ class GameUI extends React.Component
       cash: 0 - destination.price
       energy: 0 - destination.wear
       days: 1
-    console.log location
     @setState
       currentLocation: location
 
