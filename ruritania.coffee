@@ -83,95 +83,6 @@ distance = (c1, c2) ->
 
 # === ui
 
-class LocationPanel extends React.Component
-
-  eatButton: (name, type) ->
-    actionButton "#{name} ($#{@props.config.eat[type].price})",
-      () => @props.handleStatsChange
-        health: @props.config.eat[type].heal
-        cash: 0 - @props.config.eat[type].price
-      {glyph: 'cutlery'}
-
-  sleepButton: (name, type) ->
-    actionButton "#{name} ($#{@props.config.sleep[type].price})",
-      () => @props.handleStatsChange
-        health: @props.config.sleep[type].heal
-        cash: 0 - @props.config.sleep[type].price
-        energy: @props.config.sleep[type].energy
-        days: 1
-      {glyph: 'bed'}
-
-  seeButton: (name) ->
-    actionButton name,
-      () => @props.handleStatsChange
-        cash: @props.config.selfie_prize
-        energy: 0 - @props.config.selfie_wear
-        days: 1
-      {glyph: 'picture'}
-
-  render: ->
-    div {className: 'col-md-8'},
-      h2 {style: {marginBottom: 50}}, @props.location.name
-
-      div {className: 'row'},
-        div {className: 'col-md-3'},
-          h3 {}, 'Eat'
-          @eatButton 'Street food', 'street'
-          @eatButton 'Junk food', 'junk'
-          @eatButton 'In a restaurant', 'restaurant'
-        div {className: 'col-md-3'},
-          h3 {}, 'Sleep'
-          @sleepButton 'In a park', 'park'
-          @sleepButton 'In a hostel', 'hostel'
-          @sleepButton 'In a hotel', 'hotel'
-        div {className: 'col-md-6'},
-          h3 {}, 'See'
-          _.map @props.location.sights, (sight) =>
-            @seeButton "The #{sight} of #{@props.location.name}"
-
-      div {className: 'row'},
-        table {className: 'table table-hover table-condensed', id: 'travelTable', style: {marginTop: '100px'}},
-          tbody {},
-            _.map @props.location.destinations, (dest) =>
-              tr({key: dest.name},
-                td {}, dest.name
-                td {}, "$#{dest.price}"
-                td {}, actionButton 'Travel',
-                  () =>
-                    console.log dest
-                    @props.handleTravel dest,
-                  {glyph: 'plane'})
-
-# ================================
-
-class PlayerPanel extends React.Component
-
-  render: ->
-    div {className: 'col-md-4', id: 'playerPanel'},
-      h2 {}, 'Player'
-      table {className: 'table'},
-        tbody {},
-          tr {},
-            td {}, 'Health'
-            td {}, progressBar(@props.stats.health, 100, 'success')
-          tr {},
-            td {}, 'Hunger'
-            td {}, progressBar(@props.stats.hunger, 100, 'danger')
-          tr {},
-            td {}, 'Energy'
-            td {}, progressBar(@props.stats.energy, 100, 'info')
-          tr {},
-            td {}, 'Cash'
-            td {}, "$#{@props.stats.cash}"
-          tr {},
-            td {}, 'Date'
-            td {}, moment(@props.startingDate).add(@props.stats.days, 'days').format('MMM Do, YYYY')
-
-locationPanel = React.createFactory(LocationPanel)
-playerPanel = React.createFactory(PlayerPanel)
-
-# ================================
-
 class GameUI extends React.Component
 
   constructor: (props) ->
@@ -240,18 +151,98 @@ class GameUI extends React.Component
     @setState
       currentLocation: location
 
+  eatButton: (name, type) ->
+    actionButton "#{name} ($#{@state.config.eat[type].price})",
+      () => @handleStatsChange
+        health: @state.config.eat[type].heal
+        cash: 0 - @state.config.eat[type].price
+      {glyph: 'cutlery'}
+
+  sleepButton: (name, type) ->
+    actionButton "#{name} ($#{@state.config.sleep[type].price})",
+      () => @handleStatsChange
+        health: @state.config.sleep[type].heal
+        cash: 0 - @state.config.sleep[type].price
+        energy: @state.config.sleep[type].energy
+        days: 1
+      {glyph: 'bed'}
+
+  seeButton: (name) ->
+    actionButton name,
+      () => @handleStatsChange
+        cash: @state.config.selfie_prize
+        energy: 0 - @state.config.selfie_wear
+        days: 1
+      {glyph: 'picture'}
+
   render: ->
     div {},
       h1 {}, "Ruritania"
       div {className: 'row'},
-        locationPanel
-          config: @state.config
-          handleStatsChange: @handleStatsChange
-          handleTravel: @handleTravel
-          location: @state.currentLocation
+        div {className: 'col-md-8'},
+          h2 {style: {marginBottom: 50}}, @state.currentLocation.name
+
+          # = travel ui
+          div {className: 'row'},
+            div {className: 'col-md-3'},
+              h3 {}, 'Eat'
+              @eatButton 'Street food', 'street'
+              @eatButton 'Junk food', 'junk'
+              @eatButton 'In a restaurant', 'restaurant'
+            div {className: 'col-md-3'},
+              h3 {}, 'Sleep'
+              @sleepButton 'In a park', 'park'
+              @sleepButton 'In a hostel', 'hostel'
+              @sleepButton 'In a hotel', 'hotel'
+            div {className: 'col-md-6'},
+              h3 {}, 'See'
+              _.map @state.currentLocation.sights, (sight) =>
+                @seeButton "The #{sight} of #{@state.currentLocation.name}"
+
+          div {className: 'row'},
+            table {className: 'table table-hover table-condensed', id: 'travelTable', style: {marginTop: '100px'}},
+              tbody {},
+                _.map @state.currentLocation.destinations, (dest) =>
+                  tr({key: dest.name},
+                    td {}, dest.name
+                    td {}, "$#{dest.price}"
+                    td {}, actionButton 'Travel',
+                      () =>
+                        @handleTravel dest,
+                          {glyph: 'plane'})
+
         playerPanel
           startingDate: @state.config.startingDate
           stats: @state.stats
+
+# ================================
+
+class PlayerPanel extends React.Component
+
+  render: ->
+    div {className: 'col-md-4', id: 'playerPanel'},
+      h2 {}, 'Player'
+      table {className: 'table'},
+        tbody {},
+          tr {},
+            td {}, 'Health'
+            td {}, progressBar(@props.stats.health, 100, 'success')
+          tr {},
+            td {}, 'Hunger'
+            td {}, progressBar(@props.stats.hunger, 100, 'danger')
+          tr {},
+            td {}, 'Energy'
+            td {}, progressBar(@props.stats.energy, 100, 'info')
+          tr {},
+            td {}, 'Cash'
+            td {}, "$#{@props.stats.cash}"
+          tr {},
+            td {}, 'Date'
+            td {}, moment(@props.startingDate).add(@props.stats.days, 'days').format('MMM Do, YYYY')
+
+playerPanel = React.createFactory(PlayerPanel)
+
+# ================================
 
 # == Main
 
