@@ -24,7 +24,7 @@ SIGHT_NAMES = [
   'Lincoln Memorial'
 ]
 
-travelConfig =
+TRAVEL_CONFIG =
   map_size: 10
   wear_per_day: 10
   selfie_prize: 100
@@ -32,7 +32,10 @@ travelConfig =
   travel_price_multiplier: 20
   travel_wear_multiplier: 10
   sights_per_location: 3
-  startingDate: new Date("10/02/2009")
+  tick_minutes: 10
+  tick_interval: 1 # seconds
+  tick_wear: 1
+  startingTS: moment("2011-10-02T12:30").unix()
   eat:
     street:
       price: 5
@@ -60,23 +63,6 @@ travelConfig =
 
 # === utils
 
-actionButton = (caption, callback, config = {}) ->
-  cfg = _.extend({glyph: null, style: 'default'}, config)
-  c = if cfg.glyph == null then caption else "<span class='glyphicon glyphicon-#{cfg.glyph}'></span> #{caption}"
-  p {key: caption},
-    button
-      className: "btn btn-#{cfg.style}"
-      dangerouslySetInnerHTML: {__html: c}
-      onClick: callback
-
-progressBar = (value, max, style = 'default') ->
-  percent = max / 100.0 * value
-  div {className: 'progress'},
-    div {
-      className: "progress-bar progress-bar-#{style}"
-      style: {width: "#{percent}%"}
-    }, value
-
 distance = (c1, c2) ->
   Math.sqrt(Math.pow(c1[0] - c2[0], 2) + Math.pow(c1[1] - c2[1], 2))
 
@@ -87,38 +73,46 @@ class GameUI extends React.Component
 
   constructor: (props) ->
     super(props)
-    @state =
-      config: travelConfig
-    @state.locations = @genLocations()
+    @locations = @genLocations()
 
-  componentWillMount: () ->
+  componentWillMount: ->
     @resetStats()
 
-  resetStats: () ->
+  resetStats: ->
     @setState
-      currentLocation: @state.locations[0]
-      stats:
-        health: 100
-        hunger: 100
-        energy: 100
-        cash: 1000
-        days: 0 # number of days added to startingDate
+      currentLocation: @locations[0]
+      health: 100
+      hunger: 100
+      energy: 100
+      cash: 1000
+      ts: @props.startingTS
+
+  tick: =>
+    @setState (prevState) ->
+      energy: prevState.energy - @props.tick_wear
+      ts: prevState.ts + moment.duration(@props.tick_minutes, 'minutes').asSeconds()
+
+  componentDidMount: ->
+    @interval = setInterval(@tick, 1000 * @props.tick_interval);
+
+  componentWillUnmount: ->
+    clearInterval(@interval)
 
   genLocation: (locName) ->
     name: locName,
-    coords: [_.random(0, @state.config.map_size), _.random(0, @state.config.map_size)]
-    sights: _.sample(SIGHT_NAMES, @state.config.sights_per_location)
+    coords: [_.random(0, @props.map_size), _.random(0, @props.map_size)]
+    sights: _.sample(SIGHT_NAMES, @props.sights_per_location)
     destinations: []
 
-  genLocations: () ->
+  genLocations: ->
     locations = (@genLocation(x) for x in LOCATION_NAMES)
 
     for l in locations
       l.destinations = (
         {
         name: x.name
-        price: Math.floor(distance(l.coords, x.coords) * @state.config.travel_price_multiplier)
-        wear: Math.floor(distance(l.coords, x.coords) * @state.config.wear_per_day)
+        price: Math.floor(distance(l.coords, x.coords) * @props.travel_price_multiplier)
+        wear: Math.floor(distance(l.coords, x.coords) * @props.wear_per_day)
         } for x in locations when l.name isnt x.name
       )
 
@@ -127,52 +121,61 @@ class GameUI extends React.Component
   handleStatsChange: (statsChange) =>
     @setState(
       (prevState) ->
-        r = prevState.stats
-        if r.cash < 0 - statsChange.cash
+        result = {}
+        if prevState.cash < 0 - statsChange.cash
           alert 'not enough cash'
           return false
         for stat, epsilon of statsChange
-          newValue = prevState.stats[stat] + epsilon
+          newValue = prevState[stat] + epsilon
           if stat in ['health', 'hunger', 'energy']
             if newValue > 100
               newValue = 100
             else if newValue < 0
               newValue = 0
-          r[stat] = newValue
-        {stats: r}
+          result[stat] = newValue
+        result
     )
 
   handleTravel: (destination) =>
-    location = _.find @state.locations, (x) -> x.name == destination.name
+    location = _.find @locations, (x) -> x.name == destination.name
     @handleStatsChange
       cash: 0 - destination.price
       energy: 0 - destination.wear
-      days: 1
+      ts: moment.duration(1, 'day').asSeconds()
     @setState
       currentLocation: location
 
+  actionButton: (caption, callback, config = {}) ->
+    cfg = _.extend({glyph: null, style: 'default'}, config)
+    c = if cfg.glyph == null then caption else "<span class='glyphicon glyphicon-#{cfg.glyph}'></span> #{caption}"
+    p {key: caption},
+      button
+        className: "btn btn-#{cfg.style}"
+        dangerouslySetInnerHTML: {__html: c}
+        onClick: callback
+
   eatButton: (name, type) ->
-    actionButton "#{name} ($#{@state.config.eat[type].price})",
+    @actionButton "#{name} ($#{@props.eat[type].price})",
       () => @handleStatsChange
-        health: @state.config.eat[type].heal
-        cash: 0 - @state.config.eat[type].price
+        health: @props.eat[type].heal
+        cash: 0 - @props.eat[type].price
       {glyph: 'cutlery'}
 
   sleepButton: (name, type) ->
-    actionButton "#{name} ($#{@state.config.sleep[type].price})",
+    @actionButton "#{name} ($#{@props.sleep[type].price})",
       () => @handleStatsChange
-        health: @state.config.sleep[type].heal
-        cash: 0 - @state.config.sleep[type].price
-        energy: @state.config.sleep[type].energy
-        days: 1
+        health: @props.sleep[type].heal
+        cash: 0 - @props.sleep[type].price
+        energy: @props.sleep[type].energy
+        ts: moment.duration(1, 'day').asSeconds()
       {glyph: 'bed'}
 
   seeButton: (name) ->
-    actionButton name,
+    @actionButton name,
       () => @handleStatsChange
-        cash: @state.config.selfie_prize
-        energy: 0 - @state.config.selfie_wear
-        days: 1
+        cash: @props.selfie_prize
+        energy: 0 - @props.selfie_wear
+        ts: moment.duration(1, 'day').asSeconds()
       {glyph: 'picture'}
 
   render: ->
@@ -182,7 +185,7 @@ class GameUI extends React.Component
         div {className: 'col-md-8'},
           h2 {style: {marginBottom: 50}}, @state.currentLocation.name
 
-          # = travel ui
+# = travel ui
           div {className: 'row'},
             div {className: 'col-md-3'},
               h3 {}, 'Eat'
@@ -206,18 +209,24 @@ class GameUI extends React.Component
                   tr({key: dest.name},
                     td {}, dest.name
                     td {}, "$#{dest.price}"
-                    td {}, actionButton 'Travel',
+                    td {}, @actionButton 'Travel',
                       () =>
                         @handleTravel dest,
                           {glyph: 'plane'})
 
-        playerPanel
-          startingDate: @state.config.startingDate
-          stats: @state.stats
+        playerPanel @state
 
 # ================================
 
 class PlayerPanel extends React.Component
+
+  progressBar: (value, max, style = 'default') ->
+    percent = max / 100.0 * value
+    div {className: 'progress'},
+      div {
+        className: "progress-bar progress-bar-#{style}"
+        style: {width: "#{percent}%"}
+      }, value
 
   render: ->
     div {className: 'col-md-4', id: 'playerPanel'},
@@ -226,19 +235,19 @@ class PlayerPanel extends React.Component
         tbody {},
           tr {},
             td {}, 'Health'
-            td {}, progressBar(@props.stats.health, 100, 'success')
+            td {}, @progressBar(@props.health, 100, 'success')
           tr {},
             td {}, 'Hunger'
-            td {}, progressBar(@props.stats.hunger, 100, 'danger')
+            td {}, @progressBar(@props.hunger, 100, 'danger')
           tr {},
             td {}, 'Energy'
-            td {}, progressBar(@props.stats.energy, 100, 'info')
+            td {}, @progressBar(@props.energy, 100, 'info')
           tr {},
             td {}, 'Cash'
-            td {}, "$#{@props.stats.cash}"
+            td {}, "$#{@props.cash}"
           tr {},
             td {}, 'Date'
-            td {}, moment(@props.startingDate).add(@props.stats.days, 'days').format('MMM Do, YYYY')
+            td {}, moment(@props.ts * 1000).format('HH:mm MMM Do, YYYY')
 
 playerPanel = React.createFactory(PlayerPanel)
 
@@ -247,6 +256,6 @@ playerPanel = React.createFactory(PlayerPanel)
 # == Main
 
 React.render(
-  React.createElement(GameUI, {}),
+  React.createElement(GameUI, TRAVEL_CONFIG),
   document.getElementById 'content'
 )
