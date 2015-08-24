@@ -1,4 +1,3 @@
 .idea/
 node_modules/
-ruritania.js
-ruritania.js.map
+compiled/
